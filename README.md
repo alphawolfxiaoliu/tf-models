@@ -11,3 +11,13 @@ Reproducability is a major problem in NLP research. Many times have I talked to 
 - **Stanford Sentiment Treebank (SST)**:  variation on the MR dataset with individual subphrases tagged on Mechanical Turk. The Stanford Parser is used to parses all 10,662 sentences. In approximately 1,100 cases it splits the snippet into multiple sentences. We then used Amazon Mechanical Turk to label the resulting 215,154 phrases. This dataset was first used in [Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank](http://nlp.stanford.edu/~socherr/EMNLP2013_RNTN.pdf) ([Source](http://nlp.stanford.edu/sentiment/))
 - **IMDB Movie Reviews (IMDB)**: TODO ([Source](http://ai.stanford.edu/~amaas/data/sentiment/))
 - **20 Newsgroups**: TODO ([Source](http://qwone.com/~jason/20Newsgroups/))
+
+
+### Models
+
+- Naive Bayes
+- Support Vector Machine
+- Word Vector Averaging
+- Semi-Supervised LSTM from [Semi-supervised Sequence Learning (Andrew M. Dai, Quoc V. Le, 2015)](http://arxiv.org/abs/1511.01432)
+- Paragraph Vectors from [Distributed Representations of Sentences and Documents (Quoc V. Le, Tomas Mikolov, 2014)](http://arxiv.org/abs/1405.4053)
+- CNN from [Convolutional Neural Networks for Sentence Classification (Yoon Kim, 2014)](http://arxiv.org/abs/1408.5882)

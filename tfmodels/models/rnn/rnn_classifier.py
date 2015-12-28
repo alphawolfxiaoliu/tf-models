@@ -141,7 +141,8 @@ class Trainer(object):
         predictions = []
         labels = []
         total_loss = 0
-        batches = tfmodels.data.utils.batch_iter(list(zip(x_eval, y_eval)), self.batch_size, self.num_epochs)
+        num_examples = 0
+        batches = tfmodels.data.utils.batch_iter(list(zip(x_eval, y_eval)), self.batch_size, 1, fill=True)
         for batch in batches:
             x_batch, y_batch = zip(*batch)
             if len(x_batch) < self.batch_size:
@@ -160,8 +161,9 @@ class Trainer(object):
             labels = np.concatenate([labels, np.argmax(y_batch, axis=1)])
             predictions = np.concatenate([predictions, batch_predictions])
             total_loss += batch_loss
+            num_examples += len(y_batch)
         acc = metrics.accuracy_score(labels, predictions)
-        mean_loss = total_loss/len(y_eval)
+        mean_loss = total_loss/num_examples
         return [acc, mean_loss]
 
     def train_iter(self, x_train, y_train):

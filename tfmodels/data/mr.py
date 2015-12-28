@@ -20,6 +20,5 @@ def load():
         negative_examples = [s.strip() for s in f]
     # Split by words
     sentences = positive_examples + negative_examples
-    sentences = [s.split(" ") for s in sentences]
     labels = [1 for _ in positive_examples] + [0 for _ in positive_examples]
     return [sentences, labels]

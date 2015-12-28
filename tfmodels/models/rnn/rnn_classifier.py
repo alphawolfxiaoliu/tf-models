@@ -7,25 +7,17 @@ from sklearn import metrics
 
 class RNNClassifier(object):
     def __init__(self,
-                 vocabulary_size,
-                 sequence_length,
-                 batch_size,
-                 num_classes,
-                 embedding_size=128,
+                 embedding_dim=256,
                  hidden_dim=256,
                  affine_dim=256,
                  cell_class=rnn_cell.LSTMCell,
-                 num_layers=1,
+                 num_layers=2,
                  dropout_keep_prob_embedding=1.0,
                  dropout_keep_prob_affine=1.0,
                  dropout_keep_prob_cell_input=1.0,
                  dropout_keep_prob_cell_output=1.0):
 
-        self.vocabulary_size = vocabulary_size
-        self.sequence_length = sequence_length
-        self.batch_size = batch_size
-        self.num_classes = num_classes
-        self.embedding_size = embedding_size
+        self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
         self.affine_dim = affine_dim
         self.cell_class = cell_class
@@ -35,13 +27,52 @@ class RNNClassifier(object):
         self.dropout_keep_prob_cell_input = tf.constant(dropout_keep_prob_cell_input)
         self.dropout_keep_prob_cell_output = tf.constant(dropout_keep_prob_cell_output)
 
-    def build_graph(self, input_x, input_y):
+    @staticmethod
+    def add_flags():
+        tf.flags.DEFINE_integer("embedding_dim", 256, "Dimensionality of embedding layer")
+        tf.flags.DEFINE_integer("hidden_dim", 256, "Dimensionality of the RNN cells")
+        tf.flags.DEFINE_integer("affine_dim", 256, "Dimensionality of affine layer at the last step")
+        tf.flags.DEFINE_string("cell_class", "LSTM", "LSTM, GRU or BasicRNN")
+        tf.flags.DEFINE_integer("num_layers", 2, "Number of stacked RNN cells")
+        tf.flags.DEFINE_float("dropout_keep_prob_embedding", 1.0, "Embedding dropout")
+        tf.flags.DEFINE_float("dropout_keep_prob_affine", 1.0, "Affine output layer dropout")
+        tf.flags.DEFINE_float("dropout_keep_prob_cell_input", 1.0, "RNN cell input connection dropout")
+        tf.flags.DEFINE_float("dropout_keep_prob_cell_output", 1.0, "RNN cell output connection dropout")
+
+    @staticmethod
+    def from_flags():
+        FLAGS = tf.flags.FLAGS
+        cell_classes = {
+            "LSTM": rnn_cell.LSTMCell,
+            "GRU": rnn_cell.GRUCell,
+            "BasicRNN": rnn_cell.BasicRNNCell,
+        }
+        return RNNClassifier(
+            embedding_dim=FLAGS.embedding_dim,
+            hidden_dim=FLAGS.hidden_dim,
+            affine_dim=FLAGS.affine_dim,
+            cell_class=cell_classes.get(FLAGS.cell_class, rnn_cell.LSTMCell),
+            num_layers=FLAGS.num_layers,
+            dropout_keep_prob_embedding=FLAGS.dropout_keep_prob_embedding,
+            dropout_keep_prob_affine=FLAGS.dropout_keep_prob_affine,
+            dropout_keep_prob_cell_input=FLAGS.dropout_keep_prob_cell_input,
+            dropout_keep_prob_cell_output=FLAGS.dropout_keep_prob_cell_output
+        )
+
+    def build_graph(self, input_x, input_y, vocabulary_size):
+
+        # Infer graph shapes from input tensor
+        batch_size = input_x.get_shape().as_list()[0]
+        sequence_length = input_x.get_shape().as_list()[1]
+        num_classes = input_y.get_shape().as_list()[1]
+
+        # Inputs
         self.input_x = input_x
         self.input_y = input_y
 
         with tf.variable_scope("embedding"):
             W = tf.Variable(
-                tf.random_uniform([self.vocabulary_size, self.embedding_size], -1.0, 1.0),
+                tf.random_uniform([vocabulary_size, self.embedding_dim], -1.0, 1.0),
                 name="W")
             self.embedded_chars = tf.nn.embedding_lookup(W, input_x)
             self.embedded_chars_drop = tf.nn.dropout(self.embedded_chars, self.dropout_keep_prob_embedding)
@@ -49,7 +80,7 @@ class RNNClassifier(object):
         with tf.variable_scope("rnn") as scope:
             # The first RNN layer after the embedding
             first_cell = rnn_cell.DropoutWrapper(
-                self.cell_class(self.hidden_dim, self.embedding_size),
+                self.cell_class(self.hidden_dim, self.embedding_dim),
                 input_keep_prob=self.dropout_keep_prob_cell_input,
                 output_keep_prob=self.dropout_keep_prob_cell_output)
             # The next RNN layer
@@ -60,10 +91,10 @@ class RNNClassifier(object):
             # The stacked layers
             self.cell = rnn_cell.MultiRNNCell([first_cell] + [next_cell] * (self.num_layers - 1))
             # Build the recurrence
-            self.initial_state = tf.Variable(tf.zeros([self.batch_size, self.cell.state_size]))
+            self.initial_state = tf.Variable(tf.zeros([batch_size, self.cell.state_size]))
             self.rnn_states = [self.initial_state]
             self.rnn_outputs = []
-            for i in range(self.sequence_length):
+            for i in range(sequence_length):
                 if i > 0:
                     scope.reuse_variables()
                 new_output, new_state = self.cell(self.embedded_chars_drop[:, i, :], self.rnn_states[-1])
@@ -79,8 +110,8 @@ class RNNClassifier(object):
             self.affine_drop = tf.nn.dropout(self.affine, self.dropout_keep_prob_affine)
 
         with tf.variable_scope("output"):
-            W = tf.Variable(tf.truncated_normal([self.affine_dim, self.num_classes], stddev=0.1), name="W")
-            b = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name="b")
+            W = tf.Variable(tf.truncated_normal([self.affine_dim, num_classes], stddev=0.1), name="W")
+            b = tf.Variable(tf.constant(0.1, shape=[num_classes]), name="b")
             self.scores = tf.nn.xw_plus_b(self.affine_drop, W, b)
             self.predictions = tf.argmax(self.scores, 1)
 
@@ -136,8 +167,8 @@ class Trainer(object):
         batches = tfmodels.data.utils.batch_iter(list(zip(x_train, y_train)), self.batch_size, self.num_epochs)
         # Trainning loop
         for batch in batches:
-            if len(batch) < self.clf.batch_size:
-                print("WARNING: Batch was too small, skipping: ({}) < ({})".format(len(batch), self.clf.batch_size))
+            if len(batch) < self.batch_size:
+                print("WARNING: Batch was too small, skipping: ({}) < ({})".format(len(batch), self.batch_size))
                 continue
             x_batch, y_batch = zip(*batch)
             feed_dict = {
@@ -147,9 +178,7 @@ class Trainer(object):
             _, train_loss, train_acc, current_step = self.sess.run(
                 [self.train_op, self.clf.mean_loss, self.clf.acc, self.global_step],
                 feed_dict=feed_dict)
-            #print("{}: Train Accuracy: {:g}, Train Mean Loss: {:g}".format(current_step, train_acc, train_loss))
             yield [current_step, train_loss, train_acc]
-            # 
             # if self.eval_dev_every is not None and current_step % self.eval_dev_every == 0:
             #     dev_acc, dev_loss = self.eval(sess, x_dev, y_dev)
             #     print("{}: Dev Accuracy: {:g}, Dev Mean Loss: {:g}".format(current_step, dev_acc, dev_loss))

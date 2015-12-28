@@ -10,7 +10,7 @@ class RNNClassifier(object):
                  embedding_dim=256,
                  hidden_dim=256,
                  affine_dim=256,
-                 cell_class=rnn_cell.LSTMCell,
+                 cell_class=rnn_cell.BasicLSTMCell,
                  num_layers=2,
                  dropout_keep_prob_embedding=1.0,
                  dropout_keep_prob_affine=1.0,
@@ -33,7 +33,7 @@ class RNNClassifier(object):
         tf.flags.DEFINE_integer("hidden_dim", 256, "Dimensionality of the RNN cells")
         tf.flags.DEFINE_integer("affine_dim", 256, "Dimensionality of affine layer at the last step")
         tf.flags.DEFINE_string("cell_class", "LSTM", "LSTM, GRU or BasicRNN")
-        tf.flags.DEFINE_integer("num_layers", 2, "Number of stacked RNN cells")
+        tf.flags.DEFINE_integer("num_layers", 3, "Number of stacked RNN cells")
         tf.flags.DEFINE_float("dropout_keep_prob_embedding", 1.0, "Embedding dropout")
         tf.flags.DEFINE_float("dropout_keep_prob_affine", 1.0, "Affine output layer dropout")
         tf.flags.DEFINE_float("dropout_keep_prob_cell_input", 1.0, "RNN cell input connection dropout")
@@ -43,7 +43,7 @@ class RNNClassifier(object):
     def from_flags():
         FLAGS = tf.flags.FLAGS
         cell_classes = {
-            "LSTM": rnn_cell.LSTMCell,
+            "LSTM": rnn_cell.BasicLSTMCell,
             "GRU": rnn_cell.GRUCell,
             "BasicRNN": rnn_cell.BasicRNNCell,
         }
@@ -51,7 +51,7 @@ class RNNClassifier(object):
             embedding_dim=FLAGS.embedding_dim,
             hidden_dim=FLAGS.hidden_dim,
             affine_dim=FLAGS.affine_dim,
-            cell_class=cell_classes.get(FLAGS.cell_class, rnn_cell.LSTMCell),
+            cell_class=cell_classes.get(FLAGS.cell_class, rnn_cell.BasicLSTMCell),
             num_layers=FLAGS.num_layers,
             dropout_keep_prob_embedding=FLAGS.dropout_keep_prob_embedding,
             dropout_keep_prob_affine=FLAGS.dropout_keep_prob_affine,
@@ -80,12 +80,12 @@ class RNNClassifier(object):
         with tf.variable_scope("rnn") as scope:
             # The first RNN layer after the embedding
             first_cell = rnn_cell.DropoutWrapper(
-                self.cell_class(self.hidden_dim, self.embedding_dim),
+                self.cell_class(self.hidden_dim),
                 input_keep_prob=self.dropout_keep_prob_cell_input,
                 output_keep_prob=self.dropout_keep_prob_cell_output)
             # The next RNN layer
             next_cell = rnn_cell.DropoutWrapper(
-                self.cell_class(self.hidden_dim, self.hidden_dim),
+                self.cell_class(self.hidden_dim),
                 input_keep_prob=self.dropout_keep_prob_cell_input,
                 output_keep_prob=self.dropout_keep_prob_cell_output)
             # The stacked layers

@@ -44,7 +44,7 @@ def pad_sequences(sequences, pad_token="[PAD]", pad_location="LEFT", max_length=
     return result
 
 
-def batch_iter(data, batch_size, num_epochs, seed=None):
+def batch_iter(data, batch_size, num_epochs, seed=None, fill=False):
     """
     Generates a batch iterator for a dataset.
     """
@@ -61,4 +61,8 @@ def batch_iter(data, batch_size, num_epochs, seed=None):
             start_index = batch_num * batch_size
             end_index = min((batch_num + 1) * batch_size, data_length)
             selected_indices = shuffle_indices[start_index:end_index]
+            # If we don't have enough data left for a whole batch, fill it randomly
+            if fill is True and end_index >= data_length:
+                num_missing = batch_size - len(selected_indices)
+                selected_indices = np.concatenate([selected_indices, np.random.randint(0, data_length, num_missing)])
             yield data[selected_indices]

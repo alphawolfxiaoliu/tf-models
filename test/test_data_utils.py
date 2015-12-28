@@ -30,3 +30,10 @@ class TestDataUtils(unittest.TestCase):
         self.assertEqual(len(flattened), 9)
         for item in data:
             self.assertEqual(sum(1 for _ in flattened if _ == item), 3)
+
+    def test_batch_iter_fill(self):
+        data = [1, 2, 3]
+        batches = list(tfmodels.data.utils.batch_iter(data, batch_size=2, num_epochs=3, fill=True))
+        self.assertEqual(len(batches), 6)
+        flattened = list(itertools.chain(*batches))
+        self.assertEqual(len(flattened), 12)

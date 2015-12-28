@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import tfmodels.data.utils
 from tensorflow.models.rnn import rnn_cell
+from tensorflow.python.ops import rnn as tf_rnn
 from sklearn import metrics
 
 
@@ -69,6 +70,7 @@ class RNNClassifier(object):
         # Inputs
         self.input_x = input_x
         self.input_y = input_y
+        self.sequence_length = tf.fill([batch_size], sequence_length)
 
         with tf.variable_scope("embedding"):
             W = tf.Variable(
@@ -91,15 +93,21 @@ class RNNClassifier(object):
             # The stacked layers
             self.cell = rnn_cell.MultiRNNCell([first_cell] + [next_cell] * (self.num_layers - 1))
             # Build the recurrence
+            inputs = tf.split(1, sequence_length, self.embedded_chars_drop)
+            squeezed_inputs = [tf.squeeze(x) for x in inputs]
             self.initial_state = tf.Variable(tf.zeros([batch_size, self.cell.state_size]))
-            self.rnn_states = [self.initial_state]
-            self.rnn_outputs = []
-            for i in range(sequence_length):
-                if i > 0:
-                    scope.reuse_variables()
-                new_output, new_state = self.cell(self.embedded_chars_drop[:, i, :], self.rnn_states[-1])
-                self.rnn_outputs.append(new_output)
-                self.rnn_states.append(new_state)
+            self.rnn_outputs, self.rnn_states = tf_rnn.rnn(
+                self.cell,
+                squeezed_inputs,
+                initial_state=self.initial_state)
+            # self.rnn_states = [self.initial_state]
+            # self.rnn_outputs = []
+            # for i in range(sequence_length):
+            #     if i > 0:
+            #         scope.reuse_variables()
+            #     new_output, new_state = self.cell(self.embedded_chars_drop[:, i, :], self.rnn_states[-1])
+            #     self.rnn_outputs.append(new_output)
+            #     self.rnn_states.append(new_state)
             self.final_state = self.rnn_states[-1]
             self.final_output = self.rnn_outputs[-1]
 
@@ -168,7 +176,7 @@ class Trainer(object):
 
     def train_iter(self, x_train, y_train):
         # Generate batches
-        batches = tfmodels.data.utils.batch_iter(list(zip(x_train, y_train)), self.batch_size, self.num_epochs)
+        batches = tfmodels.data.utils.batch_iter(list(zip(x_train, y_train)), self.batch_size, self.num_epochs, fill=True)
         # Trainning loop
         for batch in batches:
             if len(batch) < self.batch_size:

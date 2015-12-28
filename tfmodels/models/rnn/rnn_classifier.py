@@ -154,7 +154,9 @@ class Trainer(object):
                 self.clf.dropout_keep_prob_cell_input: 1.0,
                 self.clf.dropout_keep_prob_cell_output: 1.0
             }
-            batch_predictions, batch_loss = self.sess.run([self.clf.predictions, self.clf.total_loss], feed_dict=feed_dict)
+            batch_predictions, batch_loss = self.sess.run(
+                [self.clf.predictions, self.clf.total_loss],
+                feed_dict=feed_dict)
             labels = np.concatenate([labels, np.argmax(y_batch, axis=1)])
             predictions = np.concatenate([predictions, batch_predictions])
             total_loss += batch_loss
@@ -162,7 +164,7 @@ class Trainer(object):
         mean_loss = total_loss/len(y_eval)
         return [acc, mean_loss]
 
-    def train_iter(self, x_train, y_train, x_dev, y_dev):
+    def train_iter(self, x_train, y_train):
         # Generate batches
         batches = tfmodels.data.utils.batch_iter(list(zip(x_train, y_train)), self.batch_size, self.num_epochs)
         # Trainning loop
@@ -179,6 +181,3 @@ class Trainer(object):
                 [self.train_op, self.clf.mean_loss, self.clf.acc, self.global_step],
                 feed_dict=feed_dict)
             yield [current_step, train_loss, train_acc]
-            # if self.eval_dev_every is not None and current_step % self.eval_dev_every == 0:
-            #     dev_acc, dev_loss = self.eval(sess, x_dev, y_dev)
-            #     print("{}: Dev Accuracy: {:g}, Dev Mean Loss: {:g}".format(current_step, dev_acc, dev_loss))

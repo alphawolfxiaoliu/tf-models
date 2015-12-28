@@ -85,7 +85,7 @@ class TestRNNClassifier(unittest.TestCase):
             rnn = self._build_classifier()
             t = Trainer(self.sess, rnn, BATCH_SIZE, 2)
             self.sess.run(tf.initialize_all_variables())
-            train_iter = t.train_iter(x_train, y_train, x_train, y_train)
+            train_iter = t.train_iter(x_train, y_train)
             for current_step, loss, acc in train_iter:
                 losses = losses + [loss]
         self.assertEqual(len(losses), 10)

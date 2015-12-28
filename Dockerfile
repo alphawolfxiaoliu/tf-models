@@ -1,6 +1,6 @@
-FROM b.gcr.io/tensorflow/tensorflow
+FROM python:3.4-onbuild
 
-# Pull latest branch from github
-RUN git clone https://github.com/dennybritz/tf-models.git
+COPY . /usr/src/tfmodels
+WORKDIR /usr/src/tfmodels
 
-WORKDIR tf-models
+CMD ["python"]

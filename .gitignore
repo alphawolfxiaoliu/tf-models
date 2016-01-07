@@ -1,3 +1,4 @@
+runs/
 playground*
 data/
 !tfmodels/data

@@ -1,11 +1,9 @@
 import unittest
-import tfmodels.data.mr
+from tfmodels.data.mr import MRData
 
 
 class TestDataMR(unittest.TestCase):
     def test_load_data(self):
-        sentences, labels = tfmodels.data.mr.load()
-        self.assertEqual(len(sentences), 10662)
-        self.assertEqual(len(labels), 10662)
-        self.assertEqual(sum(1 for _ in labels if _ == 1), 5331)
-        self.assertEqual(sum(1 for _ in labels if _ == 0), 5331)
+        data = MRData(padding=True, clean_str=True)
+        self.assertEqual(data.x.shape, (10662, 56))
+        self.assertEqual(data.y.shape, (10662, 2))

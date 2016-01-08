@@ -1,16 +1,22 @@
 import unittest
+from tfmodels.data.imdb import IMDBData
 import tfmodels.data.imdb
+import numpy as np
 
 
 class TestDataImdb(unittest.TestCase):
     def test_load_data(self):
-        train_x, train_y, train_y2, test_x, test_y, test_y2, unlabeled = tfmodels.data.imdb.load()
-        self.assertEqual(len(train_x), 25000)
-        self.assertEqual(len(train_y), 25000)
-        self.assertEqual(len(train_y2), 25000)
-        self.assertEqual(len(test_x), 25000)
-        self.assertEqual(len(test_y), 25000)
-        self.assertEqual(len(test_y2), 25000)
-        self.assertEqual(len(unlabeled), 50000)
-        self.assertEqual(sum(train_y), 12500)
-        self.assertEqual(sum(test_y), 12500)
+        data = IMDBData(max_length=512)
+
+        # Train
+        self.assertEqual(data.train_x.shape, (25000, 512))
+        self.assertEqual(data.train_y.shape, (25000, 2))
+        self.assertEqual(data.train_y2.shape, (25000, 8))
+
+        # Test
+        self.assertEqual(data.test_x.shape, (25000, 512))
+        self.assertEqual(data.test_y.shape, (25000, 2))
+        self.assertEqual(data.test_y2.shape, (25000, 8))
+
+        # Unlabeled Data
+        self.assertEqual(data.unlabeled.shape, (50000, 512))

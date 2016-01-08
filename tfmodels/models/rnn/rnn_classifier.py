@@ -11,6 +11,12 @@ class RNNClassifier:
     Recurrent Neural Network Classifier that makes a prediction at the last time step.
     """
 
+    PARAMS = [
+        "sequence_length", "vocabulary_size", "num_classes", "batch_size", "backprop_truncate_after",
+        "embedding_dim", "cell_class", "hidden_dim", "affine_dim", "num_layers",
+        "dropout_keep_prob_embedding", "dropout_keep_prob_affine", "dropout_keep_prob_cell_input",
+        "dropout_keep_prob_cell_output"]
+
     def __init__(self,
                  sequence_length,
                  vocabulary_size,
@@ -76,7 +82,7 @@ class RNNClassifier:
         self.input_x = input_x
         self.input_y = input_y
 
-        with tf.variable_scope("embedding"):
+        with tf.variable_scope("embedding"), with tf.device("/cpu:0"):
             W = tf.get_variable(
                 "W",
                 [self.vocabulary_size, self.embedding_dim],
@@ -139,12 +145,6 @@ class RNNClassifier:
         with tf.variable_scope("accuracy"):
             self.correct_predictions = tf.equal(self.predictions, tf.argmax(input_y, 1))
             self.acc = tf.reduce_mean(tf.cast(self.correct_predictions, "float"), name="accuracy")
-
-    PARAMS = [
-        "sequence_length", "vocabulary_size", "num_classes", "batch_size", "backprop_truncate_after",
-        "embedding_dim", "cell_class", "hidden_dim", "affine_dim", "num_layers",
-        "dropout_keep_prob_embedding", "dropout_keep_prob_affine", "dropout_keep_prob_cell_input",
-        "dropout_keep_prob_cell_output"]
 
 
 class RNNClassifierEvaluator:

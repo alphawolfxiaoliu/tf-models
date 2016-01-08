@@ -11,41 +11,40 @@ POSITIVE_SENTENCE_FILE = os.path.join(MR_DATA_DIR, "rt-polarity.pos")
 NEGATIVE_SENTENCE_FILE = os.path.join(MR_DATA_DIR, "rt-polarity.neg")
 
 
-def load():
+class MRData:
     """
     Loads and preprocessed data for the MR dataset.
-    Returns input vectors, labels, vocabulary, and inverse vocabulary.
     """
-    # Load data from files
-    with open(POSITIVE_SENTENCE_FILE) as f:
-        positive_examples = [s.strip() for s in f]
-    with open(NEGATIVE_SENTENCE_FILE) as f:
-        negative_examples = [s.strip() for s in f]
-    # Split by words
-    sentences = positive_examples + negative_examples
-    labels = [1 for _ in positive_examples] + [0 for _ in positive_examples]
-    return [sentences, labels]
+    def __init__(self, padding=True, clean_str=True):
+        # Load data from files
+        with open(POSITIVE_SENTENCE_FILE) as f:
+            positive_examples = [s.strip() for s in f]
+        with open(NEGATIVE_SENTENCE_FILE) as f:
+            negative_examples = [s.strip() for s in f]
 
+        # Append examples
+        self.sentences = positive_examples + negative_examples
+        if clean_str:
+            self.sentences = [tfmodels.data.utils.clean_str(s) for s in self.sentences]
 
-def build_train_dev(sentences, labels, random_seed=42, padding=True):
-    split_sentences = [s.split(" ") for s in sentences]
-    if padding:
-        sentences = tfmodels.data.utils.pad_sequences(split_sentences, pad_location="LEFT")
-    vocab, vocab_inv = tfmodels.data.utils.build_vocabulary(sentences)
-    x_train_all = np.array([[vocab[token] for token in sent] for sent in sentences])
-    y_train_all = pd.get_dummies(labels).values
-    x_train, x_test, y_train, y_test = train_test_split(
-        x_train_all, y_train_all, test_size=0.1, random_state=random_seed)
-    return [x_train, x_test, y_train, y_test, vocab, vocab_inv]
+        # Split and pad sentences
+        self.sentences_tokenized = [s.split(" ") for s in self.sentences]
+        if padding:
+            self.sentences_tokenized = tfmodels.data.utils.pad_sequences(
+                self.sentences_tokenized, pad_location="LEFT")
 
+        # Labels
+        self.y = [1 for _ in positive_examples] + [0 for _ in positive_examples]
+        self.y = pd.get_dummies(self.y).values
 
-def train_iter(x_train, y_train, batch_size=64, num_epochs=100, random_seed=42):
-    train_iter = tfmodels.data.utils.batch_iter(
-        list(zip(x_train, y_train)), batch_size, num_epochs, fill=True, seed=random_seed)
-    return map(lambda batch: zip(*batch), train_iter)
+        # Build the vocabulary
+        self.vocab, self.vocab_inv = tfmodels.data.utils.build_vocabulary(self.sentences_tokenized)
+        # Vectorize sentences
+        self.x = np.array([[self.vocab[token] for token in sent] for sent in self.sentences_tokenized])
 
-
-def dev_iter(x_dev, y_dev, batch_size=64, num_epochs=1, random_seed=42):
-    dev_iter = tfmodels.data.utils.batch_iter(
-        list(zip(x_dev, y_dev)), batch_size, num_epochs, fill=True, seed=random_seed)
-    return map(lambda batch: zip(*batch), dev_iter)
+    def build_train_dev(self, test_size=0.1, random_seed=42):
+        return train_test_split(
+            self.x,
+            self.y,
+            test_size=test_size,
+            random_state=random_seed)

@@ -1,23 +1,31 @@
 import numpy as np
 import tensorflow as tf
 import tfmodels.data.utils
-import tfmodels.data.mr
+from tfmodels.data.mr import MRData
+from tfmodels.data.imdb import IMDBData
 from datetime import datetime
 import time
 import os
 from tfmodels.models.rnn.rnn_classifier import RNNClassifier, RNNClassifierTrainer, RNNClassifierEvaluator
 
+# Pick training data
+tf.flags.DEFINE_boolean("data_mr", False, "Dataset: MR")
+tf.flags.DEFINE_boolean("data_sst", False, "Dataset: SST")
+
 # Classifier parameters
 RNNClassifier.add_flags()
+
 # Training parameters
 tf.flags.DEFINE_integer("random_state", 42, "Random state initialization for reproducibility")
 tf.flags.DEFINE_integer("max_sequence_length", 128, "Examples will be padded/truncated to this length")
 tf.flags.DEFINE_integer("num_epochs", 20, "Number of training epochs")
 tf.flags.DEFINE_integer("evaluate_every", 25, "Evaluate model on dev set after this number of steps")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Evaluate model on dev set after this number of steps")
+
 # Session Parameters
-tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow soft device placement (e.g. no GPU)")
+tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow soft device placement (e.g. no GPU)")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
+
 # Print parameters
 FLAGS = tf.flags.FLAGS
 FLAGS.batch_size
@@ -26,16 +34,23 @@ for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
 print("")
 
-# Load the dataset
 np.random.seed(FLAGS.random_state)
-sentences, labels = tfmodels.data.mr.load()
-x_train, x_test, y_train, y_test, vocab, vocab_inv = tfmodels.data.mr.build_train_dev(sentences, labels)
 
+# Load the Training data
+if FLAGS.data_mr:
+    print("Loading MR data...", flush=True)
+    data = MRData()
+elif FLAGS.data_sst:
+    print("Loading SST data...", flush=True)
+    data = IMDBData(padding=True, clean_str=True, max_length=FLAGS.max_sequence_length)
+
+vocab, vocab_inv = data.vocab, data.vocab_inv
+x_train, x_dev, y_train, y_dev = data.build_train_dev()
+
+# Parameters
 SEQUENCE_LENGTH = x_train.shape[1]
 VOCABULARY_SIZE = len(vocab)
-
-train_data_iter = tfmodels.data.mr.train_iter(
-    x_train, y_train, num_epochs=FLAGS.num_epochs, batch_size=FLAGS.batch_size)
+train_data_iter = tfmodels.data.utils.xy_iter(x_train, y_train, FLAGS.batch_size, FLAGS.num_epochs)
 
 # Create a graph and session
 graph = tf.Graph()
@@ -90,7 +105,7 @@ with graph.as_default(), sess.as_default():
 
         # Evaluate dev set
         if current_step % FLAGS.evaluate_every == 0:
-            dev_iter = tfmodels.data.mr.dev_iter(x_train, y_train, batch_size=FLAGS.batch_size)
+            dev_iter = tfmodels.data.utils.xy_iter(x_dev, y_dev, FLAGS.batch_size, 1)
             mean_loss, acc, _ = evaluator.eval(dev_iter, global_step=trainer.global_step)
             print("{}: Step {}, Dev Accuracy: {:g}, Dev Mean Loss: {:g}".format(
                 datetime.now().isoformat(), current_step, acc, mean_loss))

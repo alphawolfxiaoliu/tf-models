@@ -1,23 +1,28 @@
+import time
+import os
+import pprint
 import numpy as np
 import tensorflow as tf
 import tfmodels.data.utils
 from tfmodels.data.mr import MRData
 from tfmodels.data.imdb import IMDBData
+from tfmodels.data.ymrjp import YMRJPData
 from datetime import datetime
-import time
-import os
 from tfmodels.models.rnn.rnn_classifier import RNNClassifier, RNNClassifierTrainer, RNNClassifierEvaluator
+
+pp = pprint.PrettyPrinter(indent=2)
 
 # Pick training data
 tf.flags.DEFINE_boolean("data_mr", False, "Dataset: MR")
 tf.flags.DEFINE_boolean("data_sst", False, "Dataset: SST")
+tf.flags.DEFINE_boolean("data_ymrjp", False, "Dataset: Yahoo Movie Reviews (Japanese)")
 
 # Classifier parameters
 RNNClassifier.add_flags()
 
 # Training parameters
 tf.flags.DEFINE_integer("random_state", 42, "Random state initialization for reproducibility")
-tf.flags.DEFINE_integer("max_sequence_length", 128, "Examples will be padded/truncated to this length")
+tf.flags.DEFINE_integer("max_sequence_length", 512, "Examples will be padded/truncated to this length")
 tf.flags.DEFINE_integer("num_epochs", 20, "Number of training epochs")
 tf.flags.DEFINE_integer("evaluate_every", 25, "Evaluate model on dev set after this number of steps")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Evaluate model on dev set after this number of steps")
@@ -38,11 +43,15 @@ np.random.seed(FLAGS.random_state)
 
 # Load the Training data
 if FLAGS.data_mr:
-    print("Loading MR data...", flush=True)
+    print("Loading MR data...", flush=True, end="")
     data = MRData()
 elif FLAGS.data_sst:
-    print("Loading SST data...", flush=True)
+    print("Loading SST data...", flush=True, end="")
     data = IMDBData(padding=True, clean_str=True, max_length=FLAGS.max_sequence_length)
+elif FLAGS.data_ymrjp:
+    print("Loading Yahoo Movie Reviews (Japanese) data...", flush=True, end="")
+    data = YMRJPData(padding=True, max_length=FLAGS.max_sequence_length)
+print("Done.")
 
 vocab, vocab_inv = data.vocab, data.vocab_inv
 x_train, x_dev, y_train, y_dev = data.build_train_dev()
@@ -66,6 +75,7 @@ with graph.as_default(), sess.as_default():
     model_params = {"sequence_length": SEQUENCE_LENGTH, "vocabulary_size": VOCABULARY_SIZE, "num_classes": 2}
     model_params.update(FLAGS.__flags)
     model = RNNClassifier.from_dict(model_params)
+    model.print_params()
     x = tf.placeholder(tf.int32, [FLAGS.batch_size, SEQUENCE_LENGTH])
     y = tf.placeholder(tf.float32, [FLAGS.batch_size, 2])
     model.build_graph(x, y)

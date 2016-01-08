@@ -13,10 +13,21 @@ class RNNClassifier(ModelSaver):
     """
 
     PARAMS = [
-        "sequence_length", "vocabulary_size", "num_classes", "batch_size", "backprop_truncate_after",
-        "embedding_dim", "cell_class", "hidden_dim", "affine_dim", "num_layers",
-        "dropout_keep_prob_embedding", "dropout_keep_prob_affine", "dropout_keep_prob_cell_input",
-        "dropout_keep_prob_cell_output"]
+        "affine_dim",
+        "backprop_truncate_after",
+        "batch_size",
+        "cell_class",
+        "dropout_keep_prob_affine",
+        "dropout_keep_prob_cell_input",
+        "dropout_keep_prob_cell_output",
+        "dropout_keep_prob_embedding",
+        "embedding_dim",
+        "hidden_dim",
+        "num_classes",
+        "num_layers",
+        "sequence_length",
+        "vocabulary_size"
+    ]
 
     def __init__(self,
                  sequence_length,

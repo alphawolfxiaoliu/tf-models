@@ -19,3 +19,8 @@ class ModelSaver:
     def save_to_file(self, path):
         with open(path, "w") as f:
             f.write(json.dumps(self.to_dict()))
+
+    def print_params(self):
+        print("")
+        print(json.dumps(self.to_dict(), indent=2))
+        print("")

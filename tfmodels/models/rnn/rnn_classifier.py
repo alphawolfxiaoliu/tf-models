@@ -2,11 +2,12 @@ import time
 import numpy as np
 import tensorflow as tf
 import tfmodels.data.utils
+from tfmodels.models.model_saver import ModelSaver
 from tensorflow.models.rnn import rnn_cell
 from tensorflow.python.ops import rnn as tf_rnn
 
 
-class RNNClassifier:
+class RNNClassifier(ModelSaver):
     """
     Recurrent Neural Network Classifier that makes a prediction at the last time step.
     """
@@ -43,23 +44,15 @@ class RNNClassifier:
         self.hidden_dim = hidden_dim
         self.affine_dim = affine_dim
         self.num_layers = num_layers
-        self.dropout_keep_prob_embedding = tf.constant(dropout_keep_prob_embedding)
-        self.dropout_keep_prob_affine = tf.constant(dropout_keep_prob_affine)
-        self.dropout_keep_prob_cell_input = tf.constant(dropout_keep_prob_cell_input)
-        self.dropout_keep_prob_cell_output = tf.constant(dropout_keep_prob_cell_output)
+        self.dropout_keep_prob_embedding = dropout_keep_prob_embedding
+        self.dropout_keep_prob_affine = dropout_keep_prob_affine
+        self.dropout_keep_prob_cell_input = dropout_keep_prob_cell_input
+        self.dropout_keep_prob_cell_output = dropout_keep_prob_cell_output
         self.cell_class_map = {
             "LSTM": rnn_cell.BasicLSTMCell,
             "GRU": rnn_cell.GRUCell,
             "BasicRNN": rnn_cell.BasicRNNCell,
         }
-
-    @staticmethod
-    def from_dict(dict):
-        param_dict = {k: dict[k] for k in RNNClassifier.PARAMS}
-        return RNNClassifier(**param_dict)
-
-    def to_dict(self):
-        return {k: getattr(self, k) for k in RNNClassifier.PARAMS}
 
     @staticmethod
     def add_flags():
@@ -82,21 +75,26 @@ class RNNClassifier:
         self.input_x = input_x
         self.input_y = input_y
 
-        with tf.variable_scope("embedding"), with tf.device("/cpu:0"):
+        self.dropout_keep_prob_embedding_t = tf.constant(self.dropout_keep_prob_embedding)
+        self.dropout_keep_prob_affine_t = tf.constant(self.dropout_keep_prob_affine)
+        self.dropout_keep_prob_cell_input_t = tf.constant(self.dropout_keep_prob_cell_input)
+        self.dropout_keep_prob_cell_output_t = tf.constant(self.dropout_keep_prob_cell_output)
+
+        with tf.variable_scope("embedding"), tf.device("/cpu:0"):
             W = tf.get_variable(
                 "W",
                 [self.vocabulary_size, self.embedding_dim],
                 initializer=tf.random_uniform_initializer(-1.0, 1.0))
             self.embedded_chars = tf.nn.embedding_lookup(W, input_x)
-            self.embedded_chars_drop = tf.nn.dropout(self.embedded_chars, self.dropout_keep_prob_embedding)
+            self.embedded_chars_drop = tf.nn.dropout(self.embedded_chars, self.dropout_keep_prob_embedding_t)
 
         with tf.variable_scope("rnn") as scope:
             # The RNN cell
             cell_class = self.cell_class_map.get(self.cell_class)
             one_cell = rnn_cell.DropoutWrapper(
                 cell_class(self.hidden_dim),
-                input_keep_prob=self.dropout_keep_prob_cell_input,
-                output_keep_prob=self.dropout_keep_prob_cell_output)
+                input_keep_prob=self.dropout_keep_prob_cell_input_t,
+                output_keep_prob=self.dropout_keep_prob_cell_output_t)
             self.cell = rnn_cell.MultiRNNCell([one_cell] * self.num_layers)
             # Build the recurrence. We do this manually to use truncated backprop
             self.initial_state = tf.zeros([self.batch_size, self.cell.state_size])
@@ -123,7 +121,7 @@ class RNNClassifier:
                 [self.affine_dim],
                 initializer=tf.constant_initializer(0.1))
             self.affine = tf.nn.tanh(tf.nn.xw_plus_b(self.final_output, W, b))
-            self.affine_drop = tf.nn.dropout(self.affine, self.dropout_keep_prob_affine)
+            self.affine_drop = tf.nn.dropout(self.affine, self.dropout_keep_prob_affine_t)
 
         with tf.variable_scope("output"):
             W = tf.get_variable(
@@ -199,10 +197,10 @@ class RNNClassifierEvaluator:
             feed_dict = {
                 self.model.input_x: x_batch,
                 self.model.input_y: y_batch,
-                self.model.dropout_keep_prob_embedding: 1.0,
-                self.model.dropout_keep_prob_affine: 1.0,
-                self.model.dropout_keep_prob_cell_input: 1.0,
-                self.model.dropout_keep_prob_cell_output: 1.0
+                self.model.dropout_keep_prob_embedding_t: 1.0,
+                self.model.dropout_keep_prob_affine_t: 1.0,
+                self.model.dropout_keep_prob_cell_input_t: 1.0,
+                self.model.dropout_keep_prob_cell_output_t: 1.0
             }
             sess.run(self.eval_step, feed_dict=feed_dict)
         loss, acc, summaries, current_step = sess.run([self.mean_loss, self.accuracy, self.summaries, global_step])

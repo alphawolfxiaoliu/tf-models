@@ -3,6 +3,7 @@ import itertools
 import tensorflow as tf
 import numpy as np
 import tfmodels.data.utils
+import tempfile
 from tensorflow.models.rnn import rnn_cell
 from tfmodels.models.rnn.rnn_classifier import RNNClassifier, RNNClassifierTrainer, RNNClassifierEvaluator
 
@@ -37,8 +38,8 @@ class TestRNNClassifier(unittest.TestCase):
                 affine_dim=128,
                 cell_class="LSTM",
                 num_layers=2,
-                dropout_keep_prob_embedding=0.3,
-                dropout_keep_prob_affine=0.5,
+                dropout_keep_prob_embedding=1.0,
+                dropout_keep_prob_affine=1.0,
                 dropout_keep_prob_cell_input=1.0,
                 dropout_keep_prob_cell_output=1.0)
             rnn.build_graph(x, y)
@@ -77,10 +78,10 @@ class TestRNNClassifier(unittest.TestCase):
             feed_dict = {
                 rnn.input_x: x_batch,
                 rnn.input_y: y_batch,
-                rnn.dropout_keep_prob_embedding: 1.0,
-                rnn.dropout_keep_prob_affine: 1.0,
-                rnn.dropout_keep_prob_cell_input: 1.0,
-                rnn.dropout_keep_prob_cell_output: 1.0
+                rnn.dropout_keep_prob_embedding_t: 1.0,
+                rnn.dropout_keep_prob_affine_t: 1.0,
+                rnn.dropout_keep_prob_cell_input_t: 1.0,
+                rnn.dropout_keep_prob_cell_output_t: 1.0
             }
             loss = self.sess.run(rnn.total_loss, feed_dict)
             self.assertGreater(loss, 0)
@@ -106,13 +107,51 @@ class TestRNNClassifier(unittest.TestCase):
     def test_eval(self):
         x_dev = np.random.randint(0, VOCABULARY_SIZE, [BATCH_SIZE * 5, SEQUENCE_LENGTH])
         y_dev = np.eye(2)[np.ones(BATCH_SIZE * 5, dtype=np.int32)]
-        data_iter = tfmodels.data.utils.batch_iter(
-            list(zip(x_dev, y_dev)), BATCH_SIZE, 1, fill=True, seed=42)
-        data_iter = map(lambda batch: zip(*batch), data_iter)
+
+        def make_eval_iter():
+            data_iter = tfmodels.data.utils.batch_iter(
+                list(zip(x_dev, y_dev)), BATCH_SIZE, 1, fill=True, seed=42)
+            return map(lambda batch: zip(*batch), data_iter)
+
         with self.graph.as_default(), self.sess.as_default():
             rnn = self._build_classifier()
             ev = RNNClassifierEvaluator(rnn)
             self.sess.run(tf.initialize_all_variables())
-            loss, acc, current_step = ev.eval(data_iter)
+            loss, acc, current_step = ev.eval(make_eval_iter())
+            loss2, acc2, current_step = ev.eval(make_eval_iter())
+
         self.assertGreater(loss, 0)
         self.assertGreater(acc, 0)
+        self.assertEqual(loss, loss2)
+        self.assertEqual(acc, acc2)
+
+    def test_save_load(self):
+        # Data
+        x_batch = np.random.randint(0, VOCABULARY_SIZE, [BATCH_SIZE, SEQUENCE_LENGTH])
+        y_batch = np.eye(2)[np.ones(BATCH_SIZE, dtype=np.int32)]
+
+        _, checkpoint_path = tempfile.mkstemp()
+
+        with self.graph.as_default(), self.sess.as_default():
+            rnn = self._build_classifier()
+            self.sess.run(tf.initialize_all_variables())
+            saver = tf.train.Saver()
+            feed_dict = {rnn.input_x: x_batch, rnn.input_y: y_batch}
+            loss1 = self.sess.run(rnn.total_loss, feed_dict)
+            saver.save(self.sess, checkpoint_path)
+
+        # Save model hyperparameters
+        f, path = tempfile.mkstemp()
+        rnn.save_to_file(path)
+
+        with tf.Graph().as_default(), tf.Session() as sess:
+            rnn2 = RNNClassifier.load_from_file(path)
+            x = tf.placeholder(tf.int32, [BATCH_SIZE, SEQUENCE_LENGTH])
+            y = tf.placeholder(tf.float32, [BATCH_SIZE, 2])
+            rnn2.build_graph(x, y)
+            saver = tf.train.Saver()
+            saver.restore(sess, checkpoint_path)
+            feed_dict = {rnn2.input_x: x_batch, rnn2.input_y: y_batch}
+            loss2 = sess.run(rnn2.total_loss, feed_dict)
+
+        self.assertEqual(loss1, loss2)

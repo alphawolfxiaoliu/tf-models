@@ -91,6 +91,6 @@ def batch_iter(data, batch_size, num_epochs, seed=None, fill=False):
             yield data[selected_indices]
 
 
-def xy_iter(x, y, batch_size, num_epochs, random_seed=42):
-    train_iter = batch_iter(list(zip(x, y)), batch_size, num_epochs, fill=True, seed=random_seed)
+def xy_iter(x, y, batch_size, num_epochs, random_seed=42, fill=True):
+    train_iter = batch_iter(list(zip(x, y)), batch_size, num_epochs, fill=fill, seed=random_seed)
     return map(lambda batch: zip(*batch), train_iter)

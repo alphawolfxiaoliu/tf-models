@@ -16,7 +16,7 @@ class CNNClassifier(ModelSaver):
         "dropout_keep_prob_features",
         "embedding_dim",
         "filter_sizes",
-        "use_highway",
+        "num_highway",
         "num_classes",
         "num_filters",
         "sequence_length",
@@ -27,10 +27,10 @@ class CNNClassifier(ModelSaver):
                  sequence_length,
                  vocabulary_size,
                  num_classes=2,
-                 embedding_dim=128,
+                 embedding_dim=256,
                  filter_sizes="3,4,5",
                  num_filters=100,
-                 use_highway=False,
+                 num_highway=0,
                  dropout_keep_prob_embedding=1.0,
                  dropout_keep_prob_features=1.0):
 
@@ -40,7 +40,7 @@ class CNNClassifier(ModelSaver):
         self.embedding_dim = embedding_dim
         self.filter_sizes = filter_sizes
         self.num_filters = num_filters
-        self.use_highway = use_highway
+        self.num_highway = num_highway
         self.dropout_keep_prob_embedding = dropout_keep_prob_embedding
         self.dropout_keep_prob_features = dropout_keep_prob_features
 
@@ -54,7 +54,7 @@ class CNNClassifier(ModelSaver):
         tf.flags.DEFINE_integer("embedding_dim", 256, "Dimensionality of embedding layer")
         tf.flags.DEFINE_integer("num_filters", 100, "Number of filters per filter size")
         tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated list of filter widths")
-        tf.flags.DEFINE_boolean("use_highway", False, "Add highway layer on top of pooled features")
+        tf.flags.DEFINE_integer("num_highway", 0, "Number of highway layer on top of pooled features")
 
     def build_graph(self, input_x, input_y):
 
@@ -106,15 +106,18 @@ class CNNClassifier(ModelSaver):
         self.features = self.h_pool_flat
 
         # Highway Layer
-        if self.use_highway:
-            with tf.name_scope("highway"):
-                x = self.features
-                W_h = tf.Variable(tf.truncated_normal([num_filters_total, num_filters_total], stddev=0.1), name="W_h")
-                b_h = tf.Variable(tf.constant(0.1, shape=[num_filters_total]), name="b_h")
-                W_t = tf.Variable(tf.truncated_normal([num_filters_total, num_filters_total], stddev=0.1), name="W_t")
-                b_t = tf.Variable(tf.constant(-3.0, shape=[num_filters_total]), name="b_t")
-                T = tf.nn.sigmoid(tf.nn.xw_plus_b(x, W_t, b_t), name="T")
-                self.features = T * tf.nn.xw_plus_b(x, W_h, b_h) + (1.0 - T) * x
+        if self.num_highway > 0:
+            for idx in range(self.num_highway):
+                with tf.name_scope("highway-{}".format(idx + 1)):
+                    x = self.features
+                    W_h = tf.Variable(
+                        tf.truncated_normal([num_filters_total, num_filters_total], stddev=0.1), name="W_h")
+                    b_h = tf.Variable(tf.constant(0.1, shape=[num_filters_total]), name="b_h")
+                    W_t = tf.Variable(
+                        tf.truncated_normal([num_filters_total, num_filters_total], stddev=0.1), name="W_t")
+                    b_t = tf.Variable(tf.constant(-3.0, shape=[num_filters_total]), name="b_t")
+                    T = tf.nn.sigmoid(tf.nn.xw_plus_b(x, W_t, b_t), name="T")
+                    self.features = T * tf.nn.tanh(tf.nn.xw_plus_b(x, W_h, b_h)) + (1.0 - T) * x
 
         # Add dropout
         with tf.name_scope("dropout"):

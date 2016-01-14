@@ -25,8 +25,8 @@ tf.flags.DEFINE_integer("batch_size", 64, "Size for one batch of training/dev ex
 tf.flags.DEFINE_integer("random_state", 42, "Random state initialization for reproducibility")
 tf.flags.DEFINE_integer("max_sequence_length", 512, "Examples will be padded/truncated to this length")
 tf.flags.DEFINE_integer("num_epochs", 20, "Number of training epochs")
-tf.flags.DEFINE_integer("evaluate_every", 25, "Evaluate model on dev set after this number of steps")
-tf.flags.DEFINE_integer("checkpoint_every", 100, "Evaluate model on dev set after this number of steps")
+tf.flags.DEFINE_integer("evaluate_every", 50, "Evaluate model on dev set after this number of steps")
+tf.flags.DEFINE_integer("checkpoint_every", 50, "Evaluate model on dev set after this number of steps")
 
 # Session Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow soft device placement (e.g. no GPU)")
